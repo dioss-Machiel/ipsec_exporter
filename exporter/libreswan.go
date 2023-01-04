@@ -96,7 +96,7 @@ var (
 
 var (
 	lsStateRE     = regexp.MustCompile(lsState)
-	lsParentIDRE  = regexp.MustCompile(`; isakmp#(\d+)`)
+	lsParentIDRE  = regexp.MustCompile(`; isakmp#(?P<parentid>\d+)`)
 	lsStateNameRE = regexp.MustCompile(`(STATE_\w+)`)
 	lsSPIRE       = regexp.MustCompile(`([a-z]+)[?:.][a-f0-9]+@` + lsIPAddrPart)
 	lsTrafficRE   = regexp.MustCompile(`(AHin|AHout|ESPin|ESPout|IPCOMPin|IPCOMPout)=(\d+)(B|KB|MB)`)
@@ -108,6 +108,8 @@ var lsStatsRE = regexp.MustCompile(`IKE SAs: total\((\d+)\), half-open\((\d+)\)`
 func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 	ikeSAs := make(map[string]*ikeSA)
 	childSAs := make(map[string]*childSA)
+	ikeSAsById := make(map[string]*ikeSA)
+	parentIds := make(map[string]string)
 	localTS := make(map[string]string)
 	remoteTS := make(map[string]string)
 	lines := strings.Split(string(b)+"\n", "\n")
@@ -138,10 +140,12 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 		} else if matches := findNamedSubmatch(lsStateRE, lines[i]); matches != nil {
 			name := matches["conname"] + matches["coninst"]
 			key := matches["prefix"]
-			n, _ := strconv.ParseUint(matches["serialno"], 10, 32)
+			serialno := matches["serialno"]
+			n, _ := strconv.ParseUint(serialno, 10, 32)
 			child := false
-			if m := lsParentIDRE.FindStringSubmatch(lines[i]); m != nil {
+			if parentidMatch := findNamedSubmatch(lsParentIDRE, lines[i]); parentidMatch != nil {
 				child = true
+				parentIds[serialno] = parentidMatch["parentid"]
 				childSAs[key] = &childSA{
 					Name: name,
 					UID:  uint32(n),
@@ -157,7 +161,9 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 				if strings.HasPrefix(lines[i], matches["prefix"]) {
 					s := strings.TrimPrefix(lines[i], matches["prefix"])
 					if child {
-						if ikeSA, ok := ikeSAs[name]; ok {
+						if ikeSA, ok := ikeSAsById[parentIds[serialno]]; ok {
+							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[key].Name, childSAs[key].UID)] = childSAs[key]
+						} else if ikeSA, ok := ikeSAs[name]; ok {
 							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[key].Name, childSAs[key].UID)] = childSAs[key]
 						}
 						if m := lsStateNameRE.FindStringSubmatch(s); m != nil {
@@ -208,6 +214,7 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 					} else {
 						if ikeSA, ok := ikeSAs[name]; ok {
 							ikeSA.UID = uint32(n)
+							ikeSAsById[serialno] = ikeSA
 						}
 						if m := lsStateNameRE.FindStringSubmatch(s); m != nil {
 							if ikeSA, ok := ikeSAs[name]; ok {
