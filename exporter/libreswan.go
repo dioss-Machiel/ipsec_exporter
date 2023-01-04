@@ -105,9 +105,15 @@ var (
 
 var lsStatsRE = regexp.MustCompile(`IKE SAs: total\((\d+)\), half-open\((\d+)\)`)
 
+var lsTrafficStatusRE = regexp.MustCompile(
+	lsPrefix + `#(?P<serialno>\d+): ` + lsConnPart + `, type=[^,]+, add_time=[0-9]+, inBytes=(?P<inbytes>[0-9]+), outBytes=(?P<outbytes>[0-9]+), id=.*`)
+
 func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
+	// keys are names
 	ikeSAs := make(map[string]*ikeSA)
+	// keys are serials
 	childSAs := make(map[string]*childSA)
+	// keys are serials
 	ikeSAsById := make(map[string]*ikeSA)
 	parentIds := make(map[string]string)
 	localTS := make(map[string]string)
@@ -139,22 +145,21 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 			}
 		} else if matches := findNamedSubmatch(lsStateRE, lines[i]); matches != nil {
 			name := matches["conname"] + matches["coninst"]
-			key := matches["prefix"]
 			serialno := matches["serialno"]
 			n, _ := strconv.ParseUint(serialno, 10, 32)
 			child := false
 			if parentidMatch := findNamedSubmatch(lsParentIDRE, lines[i]); parentidMatch != nil {
 				child = true
 				parentIds[serialno] = parentidMatch["parentid"]
-				childSAs[key] = &childSA{
+				childSAs[serialno] = &childSA{
 					Name: name,
 					UID:  uint32(n),
 				}
 				if s := localTS[name]; s != "" {
-					childSAs[key].LocalTS = append(childSAs[key].LocalTS, s)
+					childSAs[serialno].LocalTS = append(childSAs[serialno].LocalTS, s)
 				}
 				if s := remoteTS[name]; s != "" {
-					childSAs[key].RemoteTS = append(childSAs[key].RemoteTS, s)
+					childSAs[serialno].RemoteTS = append(childSAs[serialno].RemoteTS, s)
 				}
 			}
 			for ; i < len(lines); i++ {
@@ -162,12 +167,12 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 					s := strings.TrimPrefix(lines[i], matches["prefix"])
 					if child {
 						if ikeSA, ok := ikeSAsById[parentIds[serialno]]; ok {
-							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[key].Name, childSAs[key].UID)] = childSAs[key]
+							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[serialno].Name, childSAs[serialno].UID)] = childSAs[serialno]
 						} else if ikeSA, ok := ikeSAs[name]; ok {
-							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[key].Name, childSAs[key].UID)] = childSAs[key]
+							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[serialno].Name, childSAs[serialno].UID)] = childSAs[serialno]
 						}
 						if m := lsStateNameRE.FindStringSubmatch(s); m != nil {
-							childSAs[key].State = m[1]
+							childSAs[serialno].State = m[1]
 							if ikeSA, ok := ikeSAs[name]; ok {
 								if strings.HasPrefix(m[1], "STATE_V2_") {
 									ikeSA.Version = 2
@@ -178,7 +183,7 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 						}
 						for _, m := range lsSPIRE.FindAllStringSubmatch(s, -1) {
 							if m[1] == "tun" {
-								childSAs[key].Mode = "TUNNEL"
+								childSAs[serialno].Mode = "TUNNEL"
 								break
 							}
 						}
@@ -193,17 +198,17 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 							}
 							switch m[1] {
 							case "AHin", "AHout":
-								childSAs[key].Protocol = "AH"
+								childSAs[serialno].Protocol = "AH"
 							case "ESPin", "ESPout":
-								childSAs[key].Protocol = "ESP"
+								childSAs[serialno].Protocol = "ESP"
 							case "IPCOMPin", "IPCOMPout":
-								childSAs[key].Protocol = "IPCOMP"
+								childSAs[serialno].Protocol = "IPCOMP"
 							}
-							switch strings.TrimPrefix(m[1], childSAs[key].Protocol) {
+							switch strings.TrimPrefix(m[1], childSAs[serialno].Protocol) {
 							case "in":
-								childSAs[key].InBytes = n
+								childSAs[serialno].InBytes = n
 							case "out":
-								childSAs[key].OutBytes = n
+								childSAs[serialno].OutBytes = n
 							}
 						}
 						if m := lsUsernameRE.FindStringSubmatch(s); m != nil {
@@ -237,6 +242,12 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 			m.Stats.IKESAs.Total = n
 			n, _ = strconv.ParseUint(matches[2], 10, 64)
 			m.Stats.IKESAs.HalfOpen = n
+		} else if matches := findNamedSubmatch(lsTrafficStatusRE, lines[i]); matches != nil {
+			serialNo := matches["serialno"]
+			inBytes, _ := strconv.ParseUint(matches["inbytes"], 10, 64)
+			outBytes, _ := strconv.ParseUint(matches["outbytes"], 10, 64)
+			childSAs[serialNo].InBytes = inBytes
+			childSAs[serialNo].OutBytes = outBytes
 		}
 	}
 	for _, ikeSA := range ikeSAs {
