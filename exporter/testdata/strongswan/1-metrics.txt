@@ -9,7 +9,7 @@ ipsec_half_open_ike_sas 0
 ipsec_idle_workers 11
 # HELP ipsec_ike_sa_state IKE SA state.
 # TYPE ipsec_ike_sa_state gauge
-ipsec_ike_sa_state{local_host="173.44.45.44",local_id="173.44.45.44",name="kelvic-mtn",remote_host="41.220.79.242",remote_id="41.220.79.242",remote_identity="",uid="1",version="1",vips=""} 2
+ipsec_ike_sa_state{local_host="173.44.45.44",local_id="173.44.45.44",name="kelvic-mtn",remote_host="41.220.79.242",remote_id="41.220.79.242",remote_identity="",version="1",vips=""} 2
 # HELP ipsec_ike_sas Number of currently registered IKE SAs.
 # TYPE ipsec_ike_sas gauge
 ipsec_ike_sas 1
