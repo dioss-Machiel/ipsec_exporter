@@ -29,6 +29,8 @@ func collect(t *testing.T, c prometheus.Collector) []byte {
 }
 
 var redactedLbls = []string{
+	"uid",
+	"ike_sa_uid",
 	"reqid",
 }
 

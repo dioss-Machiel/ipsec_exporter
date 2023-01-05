@@ -23,10 +23,10 @@ make
 | ipsec_up | Was the last scrape successful. |
 | ipsec_ike_sas | Number of currently registered IKE SAs. |
 | ipsec_half_open_ike_sas | Number of IKE SAs in half-open state. |
-| ipsec_ike_sa_state | IKE SA state. | name, version, local_host, local_id, remote_host, remote_id, remote_identity, vips
-| ipsec_child_sa_state | Child SA state. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
-| ipsec_child_sa_bytes_in | Number of input bytes processed. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
-| ipsec_child_sa_bytes_out | Number of output bytes processed. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_ike_sa_state | IKE SA state. | name, uid, version, local_host, local_id, remote_host, remote_id, remote_identity, vips
+| ipsec_child_sa_state | Child SA state. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_child_sa_bytes_in | Number of input bytes processed. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_child_sa_bytes_out | Number of output bytes processed. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
 
 ### Additionally exported for strongswan-only
 
@@ -40,10 +40,10 @@ make
 | ipsec_pool_ips_total | Number of addresses in the pool. | name, address
 | ipsec_online_pool_ips | Number of leases online. | name, address
 | ipsec_offline_pool_ips | Number of leases offline. | name, address
-| ipsec_ike_sa_established_seconds | Number of seconds since the IKE SA has been established. | name, version, local_host, local_id, remote_host, remote_id, remote_identity, vips
-| ipsec_child_sa_packets_in | Number of input packets processed. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
-| ipsec_child_sa_packets_out | Number of output packets processed. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
-| ipsec_child_sa_installed_seconds | Number of seconds since the child SA has been installed. | ike_sa_name, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_ike_sa_established_seconds | Number of seconds since the IKE SA has been established. | name, uid, version, local_host, local_id, remote_host, remote_id, remote_identity, vips
+| ipsec_child_sa_packets_in | Number of input packets processed. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_child_sa_packets_out | Number of output packets processed. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
+| ipsec_child_sa_installed_seconds | Number of seconds since the child SA has been installed. | ike_sa_name, ike_sa_uid, ike_sa_version, ike_sa_local_host, ike_sa_local_id, ike_sa_remote_host, ike_sa_remote_id, ike_sa_remote_identity, ike_sa_vips, name, uid, reqid, mode, protocol, local_ts, remote_ts
 
 ### strongswan state mapping
 

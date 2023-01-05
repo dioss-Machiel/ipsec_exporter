@@ -33,6 +33,7 @@ var (
 var (
 	ikeSALbls = []string{
 		"name",
+		"uid",
 		"version",
 		"local_host",
 		"local_id",
@@ -43,6 +44,7 @@ var (
 	}
 	childSALbls = []string{
 		"ike_sa_name",
+		"ike_sa_uid",
 		"ike_sa_version",
 		"ike_sa_local_host",
 		"ike_sa_local_id",
@@ -51,6 +53,7 @@ var (
 		"ike_sa_remote_identity",
 		"ike_sa_vips",
 		"name",
+		"uid",
 		"mode",
 		"protocol",
 		"reqid",
@@ -187,6 +190,7 @@ func (e *Exporter) collect(m metrics, ch chan<- prometheus.Metric) {
 	for _, ikeSA := range m.IKESAs {
 		labelValues := []string{
 			ikeSA.Name,
+			strconv.FormatUint(uint64(ikeSA.UID), 10),
 			strconv.FormatUint(uint64(ikeSA.Version), 10),
 			ikeSA.LocalHost,
 			ikeSA.LocalID,
@@ -212,6 +216,7 @@ func (e *Exporter) collect(m metrics, ch chan<- prometheus.Metric) {
 			}
 			childLabelValues := append(labelValues, []string{
 				childSA.Name,
+				strconv.FormatUint(uint64(childSA.UID), 10),
 				childSA.Mode,
 				childSA.Protocol,
 				reqID,
