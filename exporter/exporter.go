@@ -81,6 +81,7 @@ type Exporter struct {
 	ipsecCmd   []string
 	logger     log.Logger
 	mu         sync.Mutex
+	prevM      metrics
 	UidMapping *UidMapping
 
 	up                *prometheus.Desc
@@ -152,10 +153,14 @@ func (e *Exporter) scrapeIpsec() (m metrics, ok bool) {
 	switch {
 	case reSSMarker.Match(output):
 		level.Debug(e.logger).Log("msg", "Output type is detected as strongswan", "cmd", cmd)
-		return e.scrapeStrongswan(output)
+		m, ok := e.scrapeStrongswan(output)
+		e.prevM = m
+		return m, ok
 	case reLSMarker.Match(output):
 		level.Debug(e.logger).Log("msg", "Output type is detected as libreswan", "cmd", cmd)
-		return e.scrapeLibreswan(output)
+		m, ok := e.scrapeLibreswan(output)
+		e.prevM = m
+		return m, ok
 	}
 	level.Error(e.logger).Log("msg", "Failed to recognize output type", "cmd", cmd, "output", output)
 	return
@@ -200,6 +205,9 @@ func (e *Exporter) collect(m metrics, ch chan<- prometheus.Metric) {
 	ikeSAsorted := make([]*ikeSA, 0, len(m.IKESAs))
 	ikeSAsorted = append(ikeSAsorted, m.IKESAs...)
 	sort.Slice(ikeSAsorted, func(i, j int) bool {
+		if ikeSAsorted[i].Name == ikeSAsorted[j].Name {
+			return ikeSAsorted[i].UID < ikeSAsorted[j].UID
+		}
 		return ikeSAsorted[i].Name < ikeSAsorted[j].Name
 	})
 	for _, ikeSA := range ikeSAsorted {

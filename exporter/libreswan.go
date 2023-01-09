@@ -108,8 +108,39 @@ var lsStatsRE = regexp.MustCompile(`IKE SAs: total\((\d+)\), half-open\((\d+)\)`
 var lsTrafficStatusRE = regexp.MustCompile(
 	lsPrefix + `#(?P<serialno>\d+): ` + lsConnPart + `, type=[^,]+, add_time=[0-9]+, inBytes=(?P<inbytes>[0-9]+), outBytes=(?P<outbytes>[0-9]+), id=.*`)
 
+func copyIkeSA(other *ikeSA) *ikeSA {
+	return &ikeSA{
+		Name:          other.Name,
+		LocalHost:     other.LocalHost,
+		LocalID:       other.LocalID,
+		RemoteHost:    other.RemoteHost,
+		RemoteID:      other.RemoteID,
+		UID:           other.UID,
+		Version:       other.Version,
+		LocalVIPs:     other.LocalVIPs,
+		RemoteVIPs:    other.RemoteVIPs,
+		Established:   other.Established,
+		RemoteXAuthID: other.RemoteXAuthID,
+		RemoteEAPID:   other.RemoteEAPID,
+		State:         "STATE_V2_IKE_SA_DELETE",
+		ChildSAs:      make(map[string]*childSA),
+	}
+}
+
+func makeChildSAName(sa *childSA) string {
+	return fmt.Sprintf("%s-%d", sa.Name, sa.UID)
+}
+
+func ikeSAVersion(state string) uint8 {
+	if strings.HasPrefix(state, "STATE_V2_") {
+		return 2
+	} else {
+		return 1
+	}
+}
+
 func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
-	// keys are names
+	// keys are names, values are bare IKE SAs without serial
 	ikeSAs := make(map[string]*ikeSA)
 	// keys are serials
 	childSAs := make(map[string]*childSA)
@@ -167,18 +198,22 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 					s := strings.TrimPrefix(lines[i], matches["prefix"])
 					if child {
 						if ikeSA, ok := ikeSAsById[parentIds[serialno]]; ok {
-							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[serialno].Name, childSAs[serialno].UID)] = childSAs[serialno]
+							ikeSA.ChildSAs[makeChildSAName(childSAs[serialno])] = childSAs[serialno]
+						} else if ikeSA, ok := e.prevM.ikeSAsById[parentIds[serialno]]; ok {
+							newIkeSA := copyIkeSA(ikeSA)
+							ikeSAsById[parentIds[serialno]] = newIkeSA
+							newIkeSA.ChildSAs[makeChildSAName(childSAs[serialno])] = childSAs[serialno]
 						} else if ikeSA, ok := ikeSAs[name]; ok {
-							ikeSA.ChildSAs[fmt.Sprintf("%s-%d", childSAs[serialno].Name, childSAs[serialno].UID)] = childSAs[serialno]
+							newIkeSA := copyIkeSA(ikeSA)
+							newIkeSAUid, _ := strconv.ParseUint(parentIds[serialno], 10, 32)
+							newIkeSA.UID = uint32(newIkeSAUid)
+							ikeSAsById[parentIds[serialno]] = newIkeSA
+							newIkeSA.ChildSAs[makeChildSAName(childSAs[serialno])] = childSAs[serialno]
 						}
 						if m := lsStateNameRE.FindStringSubmatch(s); m != nil {
 							childSAs[serialno].State = m[1]
-							if ikeSA, ok := ikeSAs[name]; ok {
-								if strings.HasPrefix(m[1], "STATE_V2_") {
-									ikeSA.Version = 2
-								} else {
-									ikeSA.Version = 1
-								}
+							if ikeSA, ok := ikeSAsById[parentIds[serialno]]; ok {
+								ikeSA.Version = ikeSAVersion(m[1])
 							}
 						}
 						for _, m := range lsSPIRE.FindAllStringSubmatch(s, -1) {
@@ -212,23 +247,20 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 							}
 						}
 						if m := lsUsernameRE.FindStringSubmatch(s); m != nil {
-							if ikeSA, ok := ikeSAs[name]; ok {
+							if ikeSA, ok := ikeSAsById[parentIds[serialno]]; ok {
 								ikeSA.RemoteXAuthID = m[1]
 							}
 						}
 					} else {
-						if ikeSA, ok := ikeSAs[name]; ok {
-							ikeSA.UID = uint32(n)
-							ikeSAsById[serialno] = ikeSA
+						if ikeSABase, ok := ikeSAs[name]; ok {
+							newIkeSA := copyIkeSA(ikeSABase)
+							newIkeSA.UID = uint32(n)
+							ikeSAsById[serialno] = newIkeSA
 						}
 						if m := lsStateNameRE.FindStringSubmatch(s); m != nil {
-							if ikeSA, ok := ikeSAs[name]; ok {
+							if ikeSA, ok := ikeSAsById[serialno]; ok {
 								ikeSA.State = m[1]
-								if strings.HasPrefix(m[1], "STATE_V2_") {
-									ikeSA.Version = 2
-								} else {
-									ikeSA.Version = 1
-								}
+								ikeSA.Version = ikeSAVersion(m[1])
 							}
 						}
 					}
@@ -250,7 +282,8 @@ func (e *Exporter) scrapeLibreswan(b []byte) (m metrics, ok bool) {
 			childSAs[serialNo].OutBytes = outBytes
 		}
 	}
-	for _, ikeSA := range ikeSAs {
+	m.ikeSAsById = ikeSAsById
+	for _, ikeSA := range ikeSAsById {
 		if ikeSA.UID > 0 {
 			m.IKESAs = append(m.IKESAs, ikeSA)
 		}
